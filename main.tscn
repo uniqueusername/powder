@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3 uid="uid://djgte3irf4hdr"]
+[gd_scene load_steps=7 format=3 uid="uid://djgte3irf4hdr"]
 
 [ext_resource type="Texture2D" uid="uid://cgxbkoa7boess" path="res://icon.svg" id="1_8cak0"]
 
@@ -20,35 +20,99 @@ sources/1 = SubResource("TileSetAtlasSource_0lqwd")
 [sub_resource type="GDScript" id="GDScript_jog2h"]
 script/source = "extends TileMap
 
-const TILE_SIZE = 128
-const PARTICLE_SCALE = 0.25
-
+const TILE_SIZE: int = 128
+const PARTICLE_SCALE: float = 0.25
 @onready var cam = $Camera2D
+var width_in_tiles: int
+var height_in_tiles: int
+
+class Particle:
+	var position: Vector2i = Vector2i(0, 0)
+	var velocity: Vector2 = Vector2(0, 0)
+	var fixed: bool = false
+	
+var particles = []
 
 func _ready():
 	tile_set.tile_size = Vector2(TILE_SIZE, TILE_SIZE)
 	scale = Vector2(PARTICLE_SCALE, PARTICLE_SCALE)
 	
 	var viewport_size: Vector2 = get_tree().root.get_visible_rect().size / PARTICLE_SCALE
-	var width_in_tiles = ceil(viewport_size.x / TILE_SIZE)
-	var height_in_tiles = ceil(viewport_size.y / TILE_SIZE)
+	width_in_tiles = ceil(viewport_size.x / TILE_SIZE)
+	height_in_tiles = ceil(viewport_size.y / TILE_SIZE)
 	cam.position = Vector2(width_in_tiles, height_in_tiles) * TILE_SIZE / 2
+	$StaticBody2D/CollisionShape2D.shape.distance = -viewport_size.y
 	
 	for x in range(width_in_tiles):
+		var particle = Particle.new()
+		particle.position = Vector2i(x, -1)
+		particle.fixed = true
+		particles.append(particle)
+		set_cell(0, particle.position, 1, Vector2.ZERO)
+		
 		for y in range(height_in_tiles):
-			set_cell(0, Vector2i(x, y), 0, Vector2(0, 0))
+			set_cell(0, Vector2i(x, y), 0, Vector2.ZERO)
 
 func _physics_process(delta):
 	if Input.is_action_pressed(\"left_click\"):
-		set_cell(0, (get_viewport().get_mouse_position() / PARTICLE_SCALE / TILE_SIZE).floor(), 1, Vector2(0, 0))
+		var mouse_tile: Vector2i = (get_viewport().get_mouse_position() / PARTICLE_SCALE / TILE_SIZE).floor()
+		if get_cell_source_id(0, mouse_tile) == 0:
+			set_cell(0, mouse_tile, 1, Vector2.ZERO)
+			var particle = Particle.new()
+			particle.position = mouse_tile
+			particles.append(particle)
+			
+	for particle in particles:
+		if !particle.fixed:
+			particle.velocity += Vector2(0, 9.8) * delta
+			set_cell(0, particle.position, 0, Vector2.ZERO)
+			apply_particle_velocity(particle)
+			set_cell(0, particle.position, 1, Vector2.ZERO)
+			
+	print(particles)
 
 func _input(event):
 	if event.is_action_pressed(\"ui_cancel\"):
 		get_tree().quit()
 
-func _process(delta):
-	pass
+func apply_particle_velocity(particle: Particle):
+	if particle.velocity != Vector2.ZERO:
+		var velocity_normalized: Vector2 = particle.velocity.normalized()
+		var target: Vector2i = particle.position
+		var collided: bool = false
+		while target < (particle.position + Vector2i(particle.velocity.floor())):
+			if particle.velocity.y > 0: # going down
+				var target_: Vector2i = target + Vector2i(0, 1)
+				if target_.y > height_in_tiles or get_cell_source_id(0, target_) == 1:
+					particle.position.y = target.y
+					particle.velocity.y = 0
+					collided = true
+			elif particle.velocity.y < 0:
+				var target_: Vector2i = target + Vector2i(0, -1)
+				if target_.y < 0 or get_cell_source_id(0, target_) == 1:
+					particle.position.y = target.y
+					particle.velocity.y = 0
+					collided = true
+			if particle.velocity.x > 0: # going right
+				var target_: Vector2i = target + Vector2i(1, 0)
+				if target_.x > width_in_tiles or get_cell_source_id(0, target_) == 1:
+					particle.position.x = target.x
+					particle.velocity.x = 0
+					collided = true
+			elif particle.velocity.x < 0:
+				var target_: Vector2i = target + Vector2i(-1, 0)
+				if target_.x < 0 or get_cell_source_id(0, target_) == 1:
+					particle.position.x = target.x
+					particle.velocity.x = 0
+					collided = true
+			if collided: break
+			target = Vector2i((Vector2(target) + velocity_normalized).floor())
+			
+		if !collided: particle.position += Vector2i(particle.velocity.floor())
 "
+
+[sub_resource type="WorldBoundaryShape2D" id="WorldBoundaryShape2D_yj0mr"]
+distance = -324.0
 
 [node name="TileMap" type="TileMap"]
 tile_set = SubResource("TileSet_kudxj")
@@ -56,3 +120,8 @@ format = 2
 script = SubResource("GDScript_jog2h")
 
 [node name="Camera2D" type="Camera2D" parent="."]
+
+[node name="StaticBody2D" type="StaticBody2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D"]
+shape = SubResource("WorldBoundaryShape2D_yj0mr")

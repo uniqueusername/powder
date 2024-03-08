@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://djgte3irf4hdr"]
+[gd_scene load_steps=8 format=3 uid="uid://djgte3irf4hdr"]
 
 [ext_resource type="Texture2D" uid="uid://cgxbkoa7boess" path="res://icon.svg" id="1_8cak0"]
 [ext_resource type="Texture2D" uid="uid://bis17hfc2u54e" path="res://sand.png" id="2_8328s"]
@@ -49,7 +49,6 @@ func _ready():
 	width_in_tiles = ceil(viewport_size.x / TILE_SIZE)
 	height_in_tiles = ceil(viewport_size.y / TILE_SIZE)
 	cam.position = Vector2(width_in_tiles, height_in_tiles) * TILE_SIZE / 2
-	$StaticBody2D/CollisionShape2D.shape.distance = -viewport_size.y
 	
 	for x in range(width_in_tiles):
 		var particle = Particle.new()
@@ -144,7 +143,7 @@ func apply_particle_velocity(particle: Particle):
 				particle.velocity.x = 0
 				collided = true
 		if collided: break
-		target += 3*velocity_normalized
+		target += velocity_normalized
 		
 	if !collided:
 		particle.position += Vector2i(particle.velocity.floor())
@@ -159,9 +158,6 @@ func _on_tile_map_toggle_rigid(rigid: bool):
 	if rigid: text = \"now drawing walls (space)\"
 	else: text = \"now drawing sand (space)\"
 "
-
-[sub_resource type="WorldBoundaryShape2D" id="WorldBoundaryShape2D_yj0mr"]
-distance = -324.0
 
 [node name="TileMap" type="TileMap"]
 tile_set = SubResource("TileSet_kudxj")
@@ -191,10 +187,5 @@ theme_override_font_sizes/font_size = 512
 text = "press r to reset"
 
 [node name="Camera2D" type="Camera2D" parent="."]
-
-[node name="StaticBody2D" type="StaticBody2D" parent="."]
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D"]
-shape = SubResource("WorldBoundaryShape2D_yj0mr")
 
 [connection signal="toggle_rigid" from="." to="Label2" method="_on_tile_map_toggle_rigid"]
